@@ -1,0 +1,32 @@
+services:
+  elt-platform:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: elt-platform
+
+    ports:
+      - "3000:3000"
+
+    volumes:
+      - .:/app
+      - elt_platform_venv:/app/.venv
+      - elt_platform_dagster:/app/.dagster
+      - ./data:/app/data
+      - ./logs:/app/logs
+
+    env_file:
+      - .env
+
+    command:
+      - dagster
+      - dev
+      - -h
+      - 0.0.0.0
+      - -p
+      - "3000"
+
+volumes:
+  elt_platform_venv:
+  elt_platform_dagster:
