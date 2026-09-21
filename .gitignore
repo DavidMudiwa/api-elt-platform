@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -217,13 +216,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
-=======
-*.csv
+
+# api-platform project specifics
 .env
 .env.*
-*.json
 .duckdb
 data/
 __pycache__/
 secrets/
->>>>>>> b1b0547 (init)
