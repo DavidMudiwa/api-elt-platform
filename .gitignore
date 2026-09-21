@@ -225,4 +225,5 @@ __marimo__/
 .duckdb
 data/
 __pycache__/
+secrets/
 >>>>>>> b1b0547 (init)
