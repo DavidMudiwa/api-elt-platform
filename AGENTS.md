@@ -59,6 +59,7 @@ Phase 2 = GitHub → Dagster → GCS → BigQuery (asset chain: raw → parquet 
 - Smoke-test the GCS resource round-trip: `uv run python scripts/check_gcs_resource.py`
 - Load/validate Definitions without the Dagster CLI: `uv run python scripts/validate_defs.py`
 - Materialize the repositories asset locally (hits GitHub + GCS): `uv run python scripts/run_repositories_asset.py`
+- Materialize the commits asset locally; override config with `MAX_PAGES=N`: `uv run python scripts/run_commits_asset.py`
 - Add deps: `uv add <pkg>` (update `uv.lock`; Docker build uses `uv sync --frozen`)
 
 ## Layout
