@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import requests
 from dagster import AssetExecutionContext, Config, RetryPolicy, asset
 
+from common.keys import COMMITS, REPOSITORIES, raw_key
 from resources.gcs import GCSResource
 
 
@@ -70,10 +71,7 @@ def github_repositories_raw(
     )
 
     now = datetime.now(timezone.utc)
-    key = (
-        f"raw/repositories/dt={now:%Y-%m-%d}/"
-        f"repositories_{now:%Y%m%d_%H%M%S}.json"
-    )
+    key = raw_key(REPOSITORIES, now)
 
     uri = gcs.upload_json(key, repositories)
 
@@ -120,11 +118,7 @@ def github_commits_raw(
     )
 
     now = datetime.now(timezone.utc)
-    repo_slug = config.repo.replace("/", "__")
-    key = (
-        f"raw/commits/repo={repo_slug}/dt={now:%Y-%m-%d}/"
-        f"commits_{now:%Y%m%d_%H%M%S}.json"
-    )
+    key = raw_key(COMMITS, now, repo=config.repo)
 
     uri = gcs.upload_json(key, commits)
 

@@ -21,6 +21,16 @@ This is a learning project. Optimize for my understanding, not for speed.
 Dagster ELT platform. Phase 1 = GitHub API → local JSON.
 Phase 2 = GitHub → Dagster → GCS → BigQuery (asset chain: raw → parquet → bq).
 
+## GCS object naming
+
+- raw (immutable, append-only):
+  `raw/<dataset>/[repo=<owner>__<repo>/]dt=YYYY-MM-DD/<dataset>_<UTCtimestamp>.json`
+- processed (deterministic, overwrite-safe/idempotent):
+  `processed/<dataset>/[repo=<owner>__<repo>/]dt=YYYY-MM-DD/<dataset>.parquet`
+- Slashes in partition values are flattened (`dagster-io/dagster` → `dagster-io__dagster`).
+- `dt=` becomes the BigQuery partition column; `repo=` anticipates multi-repo fan-out.
+- Convention is executable in `common/keys.py` and locked by `tests/test_keys.py`.
+
 ## Environment facts
 
 - Code lives in WSL (`Ubuntu`) at `/home/david/api-platform`; Docker daemon is in WSL.
@@ -60,12 +70,15 @@ Phase 2 = GitHub → Dagster → GCS → BigQuery (asset chain: raw → parquet 
 - Load/validate Definitions without the Dagster CLI: `uv run python scripts/validate_defs.py`
 - Materialize the repositories asset locally (hits GitHub + GCS): `uv run python scripts/run_repositories_asset.py`
 - Materialize the commits asset locally; override config with `MAX_PAGES=N`: `uv run python scripts/run_commits_asset.py`
+- Run unit tests: `uv run python -m unittest discover -s tests -t . -v`
 - Add deps: `uv add <pkg>` (update `uv.lock`; Docker build uses `uv sync --frozen`)
 
 ## Layout
 
 - `assets/` — Dagster assets (Phase 1 extraction lives in `assets/github.py`)
 - `resources/` — injectable external-system handles (e.g. `GCSResource`)
+- `common/` — shared helpers (GCS key/naming convention in `common/keys.py`)
 - `infra/` — cloud config as code (e.g. `gcs-lifecycle.json`)
 - `scripts/` — standalone verification/smoke-test helpers
+- `tests/` — stdlib `unittest` suite
 - `secrets/` — gitignored + dockerignored credentials (ADC)
