@@ -53,3 +53,20 @@ class GCSResource(ConfigurableResource):
     def download_json(self, key: str) -> Any:
         """Download a JSON object and deserialise it."""
         return json.loads(self.download_bytes(key).decode("utf-8"))
+
+    def list_keys(self, prefix: str) -> list[str]:
+        """List object keys under a prefix (recursive)."""
+        blobs = self.get_client().list_blobs(self.bucket, prefix=prefix)
+        return [blob.name for blob in blobs]
+
+    def find_latest_key(self, prefix: str) -> str:
+        """Return the greatest key under a prefix.
+
+        Raw keys embed a sortable UTC timestamp, so lexicographic max == newest.
+        """
+        keys = self.list_keys(prefix)
+        if not keys:
+            raise FileNotFoundError(
+                f"No objects found under gs://{self.bucket}/{prefix}"
+            )
+        return max(keys)

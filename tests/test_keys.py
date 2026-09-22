@@ -1,7 +1,7 @@
 import unittest
 from datetime import date, datetime, timezone
 
-from common.keys import processed_key, raw_key
+from common.keys import partition_date_from_key, processed_key, raw_key
 
 RUN_TIME = datetime(2026, 9, 21, 12, 36, 9, tzinfo=timezone.utc)
 PARTITION = date(2026, 9, 21)
@@ -35,6 +35,21 @@ class ProcessedKeyTest(unittest.TestCase):
             "processed/commits/repo=dagster-io__dagster/dt=2026-09-21/"
             "commits.parquet",
         )
+
+
+class PartitionDateFromKeyTest(unittest.TestCase):
+    def test_extracts_date(self):
+        self.assertEqual(
+            partition_date_from_key(
+                "raw/commits/repo=dagster-io__dagster/dt=2026-09-21/"
+                "commits_20260921_123609.json"
+            ),
+            PARTITION,
+        )
+
+    def test_raises_without_partition(self):
+        with self.assertRaises(ValueError):
+            partition_date_from_key("raw/repositories/repositories.json")
 
 
 if __name__ == "__main__":

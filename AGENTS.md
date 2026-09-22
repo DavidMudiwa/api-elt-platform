@@ -21,6 +21,14 @@ This is a learning project. Optimize for my understanding, not for speed.
 Dagster ELT platform. Phase 1 = GitHub API → local JSON.
 Phase 2 = GitHub → Dagster → GCS → BigQuery (asset chain: raw → parquet → bq).
 
+## Data contracts
+
+- `common/schemas.py` holds explicit BigQuery column types plus partition/cluster fields.
+- `common/normalize.py` projects raw records onto that contract (adds `dt`, parses ISO timestamps).
+- repositories come from `/repositories`, which returns GitHub's **minimal** repo
+  representation — no `created_at`/`updated_at`, so those were dropped from the contract.
+- Both tables partition by `dt`; `commits` clusters on `repository`.
+
 ## GCS object naming
 
 - raw (immutable, append-only):
@@ -41,8 +49,16 @@ Phase 2 = GitHub → Dagster → GCS → BigQuery (asset chain: raw → parquet 
   Container authenticates with **user ADC** copied to `secrets/adc.json`
   (gitignored + dockerignored), via `GOOGLE_APPLICATION_CREDENTIALS` in `.env`.
 - Service account `api-platform-dev@kestra-sandbox-492709.iam.gserviceaccount.com`
-  reserved for a future keyless production path; currently has BigQuery
-  dataEditor + jobUser (GCS role added bucket-scoped in Step 3).
+  reserved for a future keyless production path. Roles are least-privilege:
+  `roles/bigquery.jobUser` at project level; `roles/bigquery.dataEditor` scoped
+  to dataset `github`; `roles/storage.objectAdmin` scoped to the GCS bucket.
+  Dataset access managed via `scripts/set_dataset_iam.py`.
+- BigQuery dataset `github` (location `us-central1`, no default table
+  expiration). Tables: `repositories`, `commits`; both partitioned by `dt`,
+  `commits` also clustered on `repository`. Access via `BigQueryResource`
+  (project/dataset from env: `GOOGLE_CLOUD_PROJECT`, `BIGQUERY_DATASET`).
+  Loads target a partition decorator (`table$YYYYMMDD`, `WRITE_TRUNCATE`) so
+  re-runs replace only that partition (idempotent).
 - Phase 2 GCS bucket: `gs://github-data-492709` (region us-central1, uniform
   bucket-level access, public access prevention, lifecycle
   raw/ only: STANDARD→NEARLINE@30d→COLDLINE@90d→ARCHIVE@365d; processed/ stays
@@ -70,14 +86,20 @@ Phase 2 = GitHub → Dagster → GCS → BigQuery (asset chain: raw → parquet 
 - Load/validate Definitions without the Dagster CLI: `uv run python scripts/validate_defs.py`
 - Materialize the repositories asset locally (hits GitHub + GCS): `uv run python scripts/run_repositories_asset.py`
 - Materialize the commits asset locally; override config with `MAX_PAGES=N`: `uv run python scripts/run_commits_asset.py`
+- Materialize the parquet assets locally (reads GCS raw, no GitHub): `uv run python scripts/run_parquet_assets.py`
+- Materialize the BigQuery load assets locally (GCS Parquet → BQ): `uv run python scripts/run_bigquery_assets.py`
 - Run unit tests: `uv run python -m unittest discover -s tests -t . -v`
 - Add deps: `uv add <pkg>` (update `uv.lock`; Docker build uses `uv sync --frozen`)
 
 ## Layout
 
-- `assets/` — Dagster assets (Phase 1 extraction lives in `assets/github.py`)
-- `resources/` — injectable external-system handles (e.g. `GCSResource`)
-- `common/` — shared helpers (GCS key/naming convention in `common/keys.py`)
+- `assets/github.py` — raw assets (GitHub API → GCS raw JSON)
+- `assets/processed.py` — processed assets (raw JSON → Parquet in GCS)
+- `assets/bigquery.py` — load assets (GCS Parquet → BigQuery)
+- `resources/` — injectable external-system handles (`GCSResource`, `BigQueryResource`)
+- `common/keys.py` — GCS key/naming convention
+- `common/normalize.py` — raw record → warehouse contract (adds `dt`, parses timestamps)
+- `common/parquet.py` — JSON→Parquet; `common/schemas.py` — explicit BQ schemas
 - `infra/` — cloud config as code (e.g. `gcs-lifecycle.json`)
 - `scripts/` — standalone verification/smoke-test helpers
 - `tests/` — stdlib `unittest` suite
