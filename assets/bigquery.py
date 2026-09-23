@@ -1,10 +1,6 @@
-from dagster import AssetExecutionContext, Config, RetryPolicy, asset
-from common.keys import (
-    COMMITS,
-    REPOSITORIES,
-    partition_date_from_key,
-    processed_prefix,
-)
+from dagster import AssetExecutionContext, AssetIn, RetryPolicy, asset
+
+from common.keys import COMMITS, REPOSITORIES, partition_date_from_key
 from common.schemas import (
     COMMITS_CLUSTERING_FIELDS,
     COMMITS_PARTITION_FIELD,
@@ -16,29 +12,23 @@ from resources.bigquery import BigQueryResource
 from resources.gcs import GCSResource
 
 
-class CommitsBigQueryConfig(Config):
-    """Which repository's processed commits to load."""
-
-    repo: str = "dagster-io/dagster"
-
-
 @asset(
+    ins={"parquet_uri": AssetIn("github_repositories_parquet")},
     retry_policy=RetryPolicy(max_retries=3, delay=5),
 )
 def github_repositories_bq(
     context: AssetExecutionContext,
     gcs: GCSResource,
     bigquery: BigQueryResource,
+    parquet_uri: str,
 ) -> str:
-    """Load the newest processed repositories Parquet into BigQuery."""
+    """Load the processed repositories Parquet into BigQuery."""
 
-    source_key = gcs.find_latest_key(processed_prefix(REPOSITORIES))
-    partition = partition_date_from_key(source_key)
-    source_uri = gcs.object_uri(source_key)
+    partition = partition_date_from_key(gcs.key_from_uri(parquet_uri))
 
     rows = bigquery.load_parquet(
         table=REPOSITORIES,
-        source_uri=source_uri,
+        source_uri=parquet_uri,
         schema=REPOSITORIES_SCHEMA,
         partition_field=REPOSITORIES_PARTITION_FIELD,
         partition_date=partition,
@@ -49,7 +39,7 @@ def github_repositories_bq(
         {
             "rows": rows,
             "table": table_id,
-            "source_parquet": source_uri,
+            "source_parquet": parquet_uri,
         }
     )
     context.log.info(f"Loaded {rows} rows into {table_id}")
@@ -58,23 +48,22 @@ def github_repositories_bq(
 
 
 @asset(
+    ins={"parquet_uri": AssetIn("github_commits_parquet")},
     retry_policy=RetryPolicy(max_retries=3, delay=5),
 )
 def github_commits_bq(
     context: AssetExecutionContext,
-    config: CommitsBigQueryConfig,
     gcs: GCSResource,
     bigquery: BigQueryResource,
+    parquet_uri: str,
 ) -> str:
-    """Load the newest processed commits Parquet for a repo into BigQuery."""
+    """Load the processed commits Parquet into BigQuery."""
 
-    source_key = gcs.find_latest_key(processed_prefix(COMMITS, repo=config.repo))
-    partition = partition_date_from_key(source_key)
-    source_uri = gcs.object_uri(source_key)
+    partition = partition_date_from_key(gcs.key_from_uri(parquet_uri))
 
     rows = bigquery.load_parquet(
         table=COMMITS,
-        source_uri=source_uri,
+        source_uri=parquet_uri,
         schema=COMMITS_SCHEMA,
         partition_field=COMMITS_PARTITION_FIELD,
         partition_date=partition,
@@ -85,9 +74,8 @@ def github_commits_bq(
     context.add_output_metadata(
         {
             "rows": rows,
-            "repo": config.repo,
             "table": table_id,
-            "source_parquet": source_uri,
+            "source_parquet": parquet_uri,
         }
     )
     context.log.info(f"Loaded {rows} rows into {table_id}")

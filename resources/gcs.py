@@ -59,14 +59,9 @@ class GCSResource(ConfigurableResource):
         blobs = self.get_client().list_blobs(self.bucket, prefix=prefix)
         return [blob.name for blob in blobs]
 
-    def find_latest_key(self, prefix: str) -> str:
-        """Return the greatest key under a prefix.
-
-        Raw keys embed a sortable UTC timestamp, so lexicographic max == newest.
-        """
-        keys = self.list_keys(prefix)
-        if not keys:
-            raise FileNotFoundError(
-                f"No objects found under gs://{self.bucket}/{prefix}"
-            )
-        return max(keys)
+    def key_from_uri(self, uri: str) -> str:
+        """Turn a `gs://` URI into a bucket-relative object key."""
+        prefix = f"gs://{self.bucket}/"
+        if not uri.startswith(prefix):
+            raise ValueError(f"URI {uri!r} is not in bucket {self.bucket!r}")
+        return uri[len(prefix):]

@@ -15,8 +15,12 @@ adc = REPO_ROOT / "secrets" / "adc.json"
 if adc.exists():
     os.environ.setdefault("GOOGLE_APPLICATION_CREDENTIALS", str(adc))
 
-from dagster import materialize  # noqa: E402
+from dagster import InMemoryIOManager, materialize  # noqa: E402
 
+from assets.github import (  # noqa: E402
+    github_commits_raw,
+    github_repositories_raw,
+)
 from assets.processed import (  # noqa: E402
     github_commits_parquet,
     github_repositories_parquet,
@@ -28,8 +32,13 @@ def main() -> None:
     gcs = GCSResource(bucket=BUCKET, project=PROJECT)
 
     result = materialize(
-        [github_repositories_parquet, github_commits_parquet],
-        resources={"gcs": gcs},
+        [
+            github_repositories_raw,
+            github_commits_raw,
+            github_repositories_parquet,
+            github_commits_parquet,
+        ],
+        resources={"gcs": gcs, "io_manager": InMemoryIOManager()},
     )
     assert result.success
 

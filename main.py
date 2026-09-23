@@ -1,4 +1,4 @@
-from dagster import Definitions
+from dagster import Definitions, InMemoryIOManager
 
 from assets.bigquery import github_commits_bq, github_repositories_bq
 from assets.github import github_commits_raw, github_repositories_raw
@@ -18,5 +18,6 @@ defs = Definitions(
     resources={
         "gcs": GCSResource(),
         "bigquery": BigQueryResource(),
+        "io_manager": InMemoryIOManager(),
     },
 )

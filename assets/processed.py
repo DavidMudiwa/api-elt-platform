@@ -1,11 +1,10 @@
-from dagster import AssetExecutionContext, Config, RetryPolicy, asset
+from dagster import AssetExecutionContext, AssetIn, Config, RetryPolicy, asset
 
 from common.keys import (
     COMMITS,
     REPOSITORIES,
     partition_date_from_key,
     processed_key,
-    raw_prefix,
 )
 from common.normalize import normalize_commit, normalize_repository
 from common.parquet import records_to_parquet_bytes
@@ -21,15 +20,17 @@ class CommitsProcessedConfig(Config):
 
 
 @asset(
+    ins={"raw_uri": AssetIn("github_repositories_raw")},
     retry_policy=RetryPolicy(max_retries=3, delay=5),
 )
 def github_repositories_parquet(
     context: AssetExecutionContext,
     gcs: GCSResource,
+    raw_uri: str,
 ) -> str:
-    """Convert the newest raw repositories JSON into Parquet in GCS."""
+    """Convert the raw repositories JSON into Parquet in GCS."""
 
-    source_key = gcs.find_latest_key(raw_prefix(REPOSITORIES))
+    source_key = gcs.key_from_uri(raw_uri)
     raw_records = gcs.download_json(source_key)
     partition = partition_date_from_key(source_key)
     records = [normalize_repository(record, partition) for record in raw_records]
@@ -54,16 +55,18 @@ def github_repositories_parquet(
 
 
 @asset(
+    ins={"raw_uri": AssetIn("github_commits_raw")},
     retry_policy=RetryPolicy(max_retries=3, delay=5),
 )
 def github_commits_parquet(
     context: AssetExecutionContext,
     config: CommitsProcessedConfig,
     gcs: GCSResource,
+    raw_uri: str,
 ) -> str:
-    """Convert the newest raw commits JSON for a repo into Parquet in GCS."""
+    """Convert the raw commits JSON for a repo into Parquet in GCS."""
 
-    source_key = gcs.find_latest_key(raw_prefix(COMMITS, repo=config.repo))
+    source_key = gcs.key_from_uri(raw_uri)
     raw_records = gcs.download_json(source_key)
     partition = partition_date_from_key(source_key)
     records = [

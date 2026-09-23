@@ -13,19 +13,35 @@ adc = REPO_ROOT / "secrets" / "adc.json"
 if adc.exists():
     os.environ.setdefault("GOOGLE_APPLICATION_CREDENTIALS", str(adc))
 
-from dagster import materialize  # noqa: E402
+from dagster import InMemoryIOManager, materialize  # noqa: E402
 
 from assets.bigquery import github_commits_bq, github_repositories_bq  # noqa: E402
+from assets.github import (  # noqa: E402
+    github_commits_raw,
+    github_repositories_raw,
+)
+from assets.processed import (  # noqa: E402
+    github_commits_parquet,
+    github_repositories_parquet,
+)
 from resources.bigquery import BigQueryResource  # noqa: E402
 from resources.gcs import GCSResource  # noqa: E402
 
 
 def main() -> None:
     result = materialize(
-        [github_repositories_bq, github_commits_bq],
+        [
+            github_repositories_raw,
+            github_commits_raw,
+            github_repositories_parquet,
+            github_commits_parquet,
+            github_repositories_bq,
+            github_commits_bq,
+        ],
         resources={
             "gcs": GCSResource(bucket=BUCKET, project=PROJECT),
             "bigquery": BigQueryResource(project=PROJECT, dataset=DATASET),
+            "io_manager": InMemoryIOManager(),
         },
     )
     assert result.success

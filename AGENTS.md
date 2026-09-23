@@ -21,6 +21,15 @@ This is a learning project. Optimize for my understanding, not for speed.
 Dagster ELT platform. Phase 1 = GitHub API → local JSON.
 Phase 2 = GitHub → Dagster → GCS → BigQuery (asset chain: raw → parquet → bq).
 
+## Asset dependencies
+
+- `raw → parquet → bq` is wired via `AssetIn` (downstream takes the upstream's
+  returned `gs://` URI as an argument), so Dagster infers lineage and ordering.
+- Values pass between assets via `InMemoryIOManager` (we only shuttle URIs; real
+  bytes live in GCS/BigQuery). Registered as `io_manager` in `Definitions`.
+- Consequence: materializing a downstream asset pulls its upstream chain. A
+  standalone `materialize([...])` must include the full subgraph (see runners).
+
 ## Data contracts
 
 - `common/schemas.py` holds explicit BigQuery column types plus partition/cluster fields.
@@ -86,8 +95,8 @@ Phase 2 = GitHub → Dagster → GCS → BigQuery (asset chain: raw → parquet 
 - Load/validate Definitions without the Dagster CLI: `uv run python scripts/validate_defs.py`
 - Materialize the repositories asset locally (hits GitHub + GCS): `uv run python scripts/run_repositories_asset.py`
 - Materialize the commits asset locally; override config with `MAX_PAGES=N`: `uv run python scripts/run_commits_asset.py`
-- Materialize the parquet assets locally (reads GCS raw, no GitHub): `uv run python scripts/run_parquet_assets.py`
-- Materialize the BigQuery load assets locally (GCS Parquet → BQ): `uv run python scripts/run_bigquery_assets.py`
+- Materialize parquet assets locally (pulls raw upstream → hits GitHub): `uv run python scripts/run_parquet_assets.py`
+- Materialize the BigQuery assets locally (pulls the whole chain → hits GitHub): `uv run python scripts/run_bigquery_assets.py`
 - Run unit tests: `uv run python -m unittest discover -s tests -t . -v`
 - Add deps: `uv add <pkg>` (update `uv.lock`; Docker build uses `uv sync --frozen`)
 
