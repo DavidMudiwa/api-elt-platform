@@ -1,4 +1,11 @@
-from dagster import AssetExecutionContext, AssetIn, Config, RetryPolicy, asset
+from dagster import (
+    AssetExecutionContext,
+    AssetIn,
+    Config,
+    MetadataValue,
+    RetryPolicy,
+    asset,
+)
 
 from common.keys import (
     COMMITS,
@@ -8,6 +15,7 @@ from common.keys import (
 )
 from common.normalize import normalize_commit, normalize_repository
 from common.parquet import records_to_parquet_bytes
+from common.schemas import COMMITS_SCHEMA, REPOSITORIES_SCHEMA, to_table_schema
 from resources.gcs import GCSResource
 
 PARQUET_CONTENT_TYPE = "application/vnd.apache.parquet"
@@ -21,6 +29,7 @@ class CommitsProcessedConfig(Config):
 
 @asset(
     ins={"raw_uri": AssetIn("github_repositories_raw")},
+    kinds={"gcs", "parquet"},
     retry_policy=RetryPolicy(max_retries=3, delay=5),
 )
 def github_repositories_parquet(
@@ -43,10 +52,11 @@ def github_repositories_parquet(
 
     context.add_output_metadata(
         {
-            "records": len(records),
-            "source_raw": source_key,
-            "gcs_uri": uri,
-            "size_bytes": len(parquet_bytes),
+            "records": MetadataValue.int(len(records)),
+            "source_raw": MetadataValue.text(source_key),
+            "gcs_uri": MetadataValue.url(uri),
+            "size_bytes": MetadataValue.int(len(parquet_bytes)),
+            "schema": to_table_schema(REPOSITORIES_SCHEMA),
         }
     )
     context.log.info(f"Converted {len(records)} repositories -> {uri}")
@@ -56,6 +66,7 @@ def github_repositories_parquet(
 
 @asset(
     ins={"raw_uri": AssetIn("github_commits_raw")},
+    kinds={"gcs", "parquet"},
     retry_policy=RetryPolicy(max_retries=3, delay=5),
 )
 def github_commits_parquet(
@@ -81,11 +92,12 @@ def github_commits_parquet(
 
     context.add_output_metadata(
         {
-            "records": len(records),
-            "repo": config.repo,
-            "source_raw": source_key,
-            "gcs_uri": uri,
-            "size_bytes": len(parquet_bytes),
+            "records": MetadataValue.int(len(records)),
+            "repo": MetadataValue.text(config.repo),
+            "source_raw": MetadataValue.text(source_key),
+            "gcs_uri": MetadataValue.url(uri),
+            "size_bytes": MetadataValue.int(len(parquet_bytes)),
+            "schema": to_table_schema(COMMITS_SCHEMA),
         }
     )
     context.log.info(f"Converted {len(records)} commits -> {uri}")

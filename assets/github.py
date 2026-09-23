@@ -1,7 +1,13 @@
 from datetime import datetime, timezone
 
 import requests
-from dagster import AssetExecutionContext, Config, RetryPolicy, asset
+from dagster import (
+    AssetExecutionContext,
+    Config,
+    MetadataValue,
+    RetryPolicy,
+    asset,
+)
 
 from common.keys import COMMITS, REPOSITORIES, raw_key
 from resources.gcs import GCSResource
@@ -51,10 +57,11 @@ def extract_paginated(
 
 
 @asset(
+    kinds={"github", "gcs"},
     retry_policy=RetryPolicy(
         max_retries=3,
         delay=5,
-    )
+    ),
 )
 def github_repositories_raw(
     context: AssetExecutionContext,
@@ -77,8 +84,8 @@ def github_repositories_raw(
 
     context.add_output_metadata(
         {
-            "records": len(repositories),
-            "gcs_uri": uri,
+            "records": MetadataValue.int(len(repositories)),
+            "gcs_uri": MetadataValue.url(uri),
         }
     )
 
@@ -97,10 +104,11 @@ class CommitsConfig(Config):
 
 
 @asset(
+    kinds={"github", "gcs"},
     retry_policy=RetryPolicy(
         max_retries=3,
         delay=5,
-    )
+    ),
 )
 def github_commits_raw(
     context: AssetExecutionContext,
@@ -124,9 +132,9 @@ def github_commits_raw(
 
     context.add_output_metadata(
         {
-            "records": len(commits),
-            "repo": config.repo,
-            "gcs_uri": uri,
+            "records": MetadataValue.int(len(commits)),
+            "repo": MetadataValue.text(config.repo),
+            "gcs_uri": MetadataValue.url(uri),
         }
     )
 

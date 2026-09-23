@@ -1,4 +1,10 @@
-from dagster import AssetExecutionContext, AssetIn, RetryPolicy, asset
+from dagster import (
+    AssetExecutionContext,
+    AssetIn,
+    MetadataValue,
+    RetryPolicy,
+    asset,
+)
 
 from common.keys import COMMITS, REPOSITORIES, partition_date_from_key
 from common.schemas import (
@@ -7,6 +13,7 @@ from common.schemas import (
     COMMITS_SCHEMA,
     REPOSITORIES_PARTITION_FIELD,
     REPOSITORIES_SCHEMA,
+    to_table_schema,
 )
 from resources.bigquery import BigQueryResource
 from resources.gcs import GCSResource
@@ -14,6 +21,7 @@ from resources.gcs import GCSResource
 
 @asset(
     ins={"parquet_uri": AssetIn("github_repositories_parquet")},
+    kinds={"bigquery"},
     retry_policy=RetryPolicy(max_retries=3, delay=5),
 )
 def github_repositories_bq(
@@ -37,9 +45,11 @@ def github_repositories_bq(
     table_id = bigquery.table_id(REPOSITORIES)
     context.add_output_metadata(
         {
-            "rows": rows,
-            "table": table_id,
-            "source_parquet": parquet_uri,
+            "rows": MetadataValue.int(rows),
+            "table": MetadataValue.text(table_id),
+            "source_parquet": MetadataValue.url(parquet_uri),
+            "partition_field": MetadataValue.text(REPOSITORIES_PARTITION_FIELD),
+            "schema": to_table_schema(REPOSITORIES_SCHEMA),
         }
     )
     context.log.info(f"Loaded {rows} rows into {table_id}")
@@ -49,6 +59,7 @@ def github_repositories_bq(
 
 @asset(
     ins={"parquet_uri": AssetIn("github_commits_parquet")},
+    kinds={"bigquery"},
     retry_policy=RetryPolicy(max_retries=3, delay=5),
 )
 def github_commits_bq(
@@ -73,9 +84,12 @@ def github_commits_bq(
     table_id = bigquery.table_id(COMMITS)
     context.add_output_metadata(
         {
-            "rows": rows,
-            "table": table_id,
-            "source_parquet": parquet_uri,
+            "rows": MetadataValue.int(rows),
+            "table": MetadataValue.text(table_id),
+            "source_parquet": MetadataValue.url(parquet_uri),
+            "partition_field": MetadataValue.text(COMMITS_PARTITION_FIELD),
+            "clustering_fields": MetadataValue.json(COMMITS_CLUSTERING_FIELDS),
+            "schema": to_table_schema(COMMITS_SCHEMA),
         }
     )
     context.log.info(f"Loaded {rows} rows into {table_id}")

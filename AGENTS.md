@@ -29,6 +29,9 @@ Phase 2 = GitHub → Dagster → GCS → BigQuery (asset chain: raw → parquet 
   bytes live in GCS/BigQuery). Registered as `io_manager` in `Definitions`.
 - Consequence: materializing a downstream asset pulls its upstream chain. A
   standalone `materialize([...])` must include the full subgraph (see runners).
+- Assets carry `kinds` badges and rich output metadata: typed values
+  (`MetadataValue.int/url/text/json`) plus a `TableSchema` rendered from
+  `common/schemas.py` via `to_table_schema`.
 
 ## Data contracts
 
@@ -79,7 +82,10 @@ Phase 2 = GitHub → Dagster → GCS → BigQuery (asset chain: raw → parquet 
 - Pre-existing resources (unrelated): bucket `ecommerce_product_files`,
   BQ datasets `products_raw`, `takealot_raw`.
 - Named volume `elt_platform_venv` mounts at `/app/.venv` and shadows image
-  rebuilds — recreate with `docker compose down -v` or `uv sync` in-container.
+  rebuilds: after changing deps, an image rebuild alone is NOT enough. Sync the
+  container venv in place: `docker compose exec -T elt-platform uv sync --frozen`
+  (then `docker compose restart elt-platform`), or recreate the volume with
+  `docker compose down -v && docker compose up --build`.
 - Dagster auto-loads `.env` and its values **override** the process env, so the
   container `DAGSTER_HOME=/app/.dagster` breaks local CLI runs (`dagster
   definitions validate`, `dagster dev`). Use the Python import checks below, or
