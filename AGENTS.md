@@ -115,6 +115,7 @@ Phase 2 = GitHub → Dagster → GCS → BigQuery (asset chain: raw → parquet 
 - Materialize the commits asset locally; override with `PARTITION=YYYY-MM-DD` / `MAX_PAGES=N`: `uv run python scripts/run_commits_asset.py`
 - Materialize parquet assets locally (pulls raw upstream → hits GitHub); commits partition via `PARTITION=YYYY-MM-DD`: `uv run python scripts/run_parquet_assets.py`
 - Materialize the BigQuery assets locally (pulls the whole chain → hits GitHub); commits partition via `PARTITION=YYYY-MM-DD`: `uv run python scripts/run_bigquery_assets.py`
+- Backfill a commits partition range in-process (capped at 5): `BACKFILL_START=2026-09-21 BACKFILL_END=2026-09-22 uv run python scripts/backfill_commits.py`
 - Run unit tests: `uv run python -m unittest discover -s tests -t . -v`
 - Add deps: `uv add <pkg>` (update `uv.lock`; Docker build uses `uv sync --frozen`)
 
