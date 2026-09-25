@@ -1,5 +1,6 @@
 import os
 import sys
+from datetime import date
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -7,6 +8,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 BUCKET = "github-data-492709"
 PROJECT = "kestra-sandbox-492709"
+PARTITION = os.environ.get("PARTITION", date.today().isoformat())
 
 adc = REPO_ROOT / "secrets" / "adc.json"
 if adc.exists():
@@ -28,6 +30,7 @@ def main() -> None:
 
     result = materialize(
         [github_commits_raw],
+        partition_key=PARTITION,
         resources={"gcs": GCSResource(bucket=BUCKET, project=PROJECT)},
         run_config=run_config,
     )

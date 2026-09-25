@@ -21,6 +21,18 @@ class RawKeyTest(unittest.TestCase):
             "commits_20260921_123609.json",
         )
 
+    def test_explicit_partition_date_overrides_run_time_date(self):
+        self.assertEqual(
+            raw_key(
+                "commits",
+                RUN_TIME,
+                repo="dagster-io/dagster",
+                partition_date=date(2026, 9, 1),
+            ),
+            "raw/commits/repo=dagster-io__dagster/dt=2026-09-01/"
+            "commits_20260921_123609.json",
+        )
+
 
 class ProcessedKeyTest(unittest.TestCase):
     def test_repositories_key_is_deterministic(self):

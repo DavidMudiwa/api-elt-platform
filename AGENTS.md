@@ -33,6 +33,18 @@ Phase 2 = GitHub → Dagster → GCS → BigQuery (asset chain: raw → parquet 
   (`MetadataValue.int/url/text/json`) plus a `TableSchema` rendered from
   `common/schemas.py` via `to_table_schema`.
 
+## Partitions
+
+- `github_commits_*` are daily-partitioned (`common/partitions.py`, start
+  2026-09-01 UTC). `github_repositories_*` stay unpartitioned snapshots (the
+  `/repositories` endpoint has no date filter, so daily partitions would be fake).
+- The Dagster partition key becomes the data's `dt` (GCS path + BigQuery
+  partition); commits raw slices the day via GitHub `?since=&until=`.
+- Materialize one partition: `PARTITION=2026-09-22 uv run python scripts/run_bigquery_assets.py`
+  (or `run_commits_asset.py` / `run_parquet_assets.py`).
+- Backfills cost ~1 request per partition (+pagination). Unauthenticated GitHub
+  is 60 req/hr, so backfill small ranges until a `GITHUB_TOKEN` resource exists.
+
 ## Data contracts
 
 - `common/schemas.py` holds explicit BigQuery column types plus partition/cluster fields.
@@ -100,9 +112,9 @@ Phase 2 = GitHub → Dagster → GCS → BigQuery (asset chain: raw → parquet 
 - Smoke-test the GCS resource round-trip: `uv run python scripts/check_gcs_resource.py`
 - Load/validate Definitions without the Dagster CLI: `uv run python scripts/validate_defs.py`
 - Materialize the repositories asset locally (hits GitHub + GCS): `uv run python scripts/run_repositories_asset.py`
-- Materialize the commits asset locally; override config with `MAX_PAGES=N`: `uv run python scripts/run_commits_asset.py`
-- Materialize parquet assets locally (pulls raw upstream → hits GitHub): `uv run python scripts/run_parquet_assets.py`
-- Materialize the BigQuery assets locally (pulls the whole chain → hits GitHub): `uv run python scripts/run_bigquery_assets.py`
+- Materialize the commits asset locally; override with `PARTITION=YYYY-MM-DD` / `MAX_PAGES=N`: `uv run python scripts/run_commits_asset.py`
+- Materialize parquet assets locally (pulls raw upstream → hits GitHub); commits partition via `PARTITION=YYYY-MM-DD`: `uv run python scripts/run_parquet_assets.py`
+- Materialize the BigQuery assets locally (pulls the whole chain → hits GitHub); commits partition via `PARTITION=YYYY-MM-DD`: `uv run python scripts/run_bigquery_assets.py`
 - Run unit tests: `uv run python -m unittest discover -s tests -t . -v`
 - Add deps: `uv add <pkg>` (update `uv.lock`; Docker build uses `uv sync --frozen`)
 

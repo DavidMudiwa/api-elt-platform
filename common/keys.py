@@ -27,11 +27,18 @@ def raw_key(
     dataset: str,
     run_time: datetime,
     repo: str | None = None,
+    partition_date: date | None = None,
 ) -> str:
-    """Immutable, timestamped raw object key (append-only)."""
+    """Immutable, timestamped raw object key (append-only).
+
+    `dt` comes from `partition_date` when supplied (a Dagster partition);
+    otherwise it falls back to `run_time`. The filename timestamp always
+    reflects the actual run.
+    """
+    partition = partition_date or run_time.date()
     return (
         f"{raw_prefix(dataset, repo)}"
-        f"dt={run_time:%Y-%m-%d}/{dataset}_{run_time:%Y%m%d_%H%M%S}.json"
+        f"dt={partition:%Y-%m-%d}/{dataset}_{run_time:%Y%m%d_%H%M%S}.json"
     )
 
 

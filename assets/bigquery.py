@@ -1,3 +1,5 @@
+from datetime import date
+
 from dagster import (
     AssetExecutionContext,
     AssetIn,
@@ -7,6 +9,7 @@ from dagster import (
 )
 
 from common.keys import COMMITS, REPOSITORIES, partition_date_from_key
+from common.partitions import COMMITS_PARTITIONS
 from common.schemas import (
     COMMITS_CLUSTERING_FIELDS,
     COMMITS_PARTITION_FIELD,
@@ -59,6 +62,7 @@ def github_repositories_bq(
 
 @asset(
     ins={"parquet_uri": AssetIn("github_commits_parquet")},
+    partitions_def=COMMITS_PARTITIONS,
     kinds={"bigquery"},
     retry_policy=RetryPolicy(max_retries=3, delay=5),
 )
@@ -70,7 +74,7 @@ def github_commits_bq(
 ) -> str:
     """Load the processed commits Parquet into BigQuery."""
 
-    partition = partition_date_from_key(gcs.key_from_uri(parquet_uri))
+    partition = date.fromisoformat(context.partition_key)
 
     rows = bigquery.load_parquet(
         table=COMMITS,
@@ -86,6 +90,7 @@ def github_commits_bq(
         {
             "rows": MetadataValue.int(rows),
             "table": MetadataValue.text(table_id),
+            "partition": MetadataValue.text(context.partition_key),
             "source_parquet": MetadataValue.url(parquet_uri),
             "partition_field": MetadataValue.text(COMMITS_PARTITION_FIELD),
             "clustering_fields": MetadataValue.json(COMMITS_CLUSTERING_FIELDS),

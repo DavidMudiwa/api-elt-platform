@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 import requests
 from dagster import (
@@ -10,6 +10,7 @@ from dagster import (
 )
 
 from common.keys import COMMITS, REPOSITORIES, raw_key
+from common.partitions import COMMITS_PARTITIONS
 from resources.gcs import GCSResource
 
 
@@ -19,6 +20,7 @@ def extract_paginated(
     item_label: str,
     per_page: int,
     max_pages: int,
+    extra_params: dict | None = None,
 ) -> list[dict]:
     """Fetch GitHub API pages until a page is empty or max_pages is reached."""
     items: list[dict] = []
@@ -33,6 +35,7 @@ def extract_paginated(
         params = {
             "page": page,
             "per_page": per_page,
+            **(extra_params or {}),
         }
 
         try:
@@ -104,6 +107,7 @@ class CommitsConfig(Config):
 
 
 @asset(
+    partitions_def=COMMITS_PARTITIONS,
     kinds={"github", "gcs"},
     retry_policy=RetryPolicy(
         max_retries=3,
@@ -115,7 +119,11 @@ def github_commits_raw(
     config: CommitsConfig,
     gcs: GCSResource,
 ) -> str:
-    """Extract recent commits from a GitHub repo and store the raw JSON in GCS."""
+    """Extract one day's commits from a GitHub repo and store raw JSON in GCS."""
+
+    partition_date = date.fromisoformat(context.partition_key)
+    since = datetime.combine(partition_date, time.min, tzinfo=timezone.utc)
+    until = since + timedelta(days=1)
 
     commits = extract_paginated(
         context=context,
@@ -123,10 +131,11 @@ def github_commits_raw(
         item_label="commits",
         per_page=config.per_page,
         max_pages=config.max_pages,
+        extra_params={"since": since.isoformat(), "until": until.isoformat()},
     )
 
     now = datetime.now(timezone.utc)
-    key = raw_key(COMMITS, now, repo=config.repo)
+    key = raw_key(COMMITS, now, repo=config.repo, partition_date=partition_date)
 
     uri = gcs.upload_json(key, commits)
 
@@ -134,6 +143,7 @@ def github_commits_raw(
         {
             "records": MetadataValue.int(len(commits)),
             "repo": MetadataValue.text(config.repo),
+            "partition": MetadataValue.text(context.partition_key),
             "gcs_uri": MetadataValue.url(uri),
         }
     )

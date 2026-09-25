@@ -1,3 +1,5 @@
+from datetime import date
+
 from dagster import (
     AssetExecutionContext,
     AssetIn,
@@ -15,6 +17,7 @@ from common.keys import (
 )
 from common.normalize import normalize_commit, normalize_repository
 from common.parquet import records_to_parquet_bytes
+from common.partitions import COMMITS_PARTITIONS
 from common.schemas import COMMITS_SCHEMA, REPOSITORIES_SCHEMA, to_table_schema
 from resources.gcs import GCSResource
 
@@ -66,6 +69,7 @@ def github_repositories_parquet(
 
 @asset(
     ins={"raw_uri": AssetIn("github_commits_raw")},
+    partitions_def=COMMITS_PARTITIONS,
     kinds={"gcs", "parquet"},
     retry_policy=RetryPolicy(max_retries=3, delay=5),
 )
@@ -79,7 +83,7 @@ def github_commits_parquet(
 
     source_key = gcs.key_from_uri(raw_uri)
     raw_records = gcs.download_json(source_key)
-    partition = partition_date_from_key(source_key)
+    partition = date.fromisoformat(context.partition_key)
     records = [
         normalize_commit(record, config.repo, partition) for record in raw_records
     ]
@@ -94,6 +98,7 @@ def github_commits_parquet(
         {
             "records": MetadataValue.int(len(records)),
             "repo": MetadataValue.text(config.repo),
+            "partition": MetadataValue.text(context.partition_key),
             "source_raw": MetadataValue.text(source_key),
             "gcs_uri": MetadataValue.url(uri),
             "size_bytes": MetadataValue.int(len(parquet_bytes)),
