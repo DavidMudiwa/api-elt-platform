@@ -16,13 +16,12 @@ adc = REPO_ROOT / "secrets" / "adc.json"
 if adc.exists():
     os.environ.setdefault("GOOGLE_APPLICATION_CREDENTIALS", str(adc))
 
-from dagster import InMemoryIOManager, materialize  # noqa: E402
-
-from assets.bigquery import github_commits_bq  # noqa: E402
-from assets.github import github_commits_raw  # noqa: E402
-from assets.processed import github_commits_parquet  # noqa: E402
-from resources.bigquery import BigQueryResource  # noqa: E402
-from resources.gcs import GCSResource  # noqa: E402
+from dagster import InMemoryIOManager, materialize 
+from assets.bigquery import github_commits_bq 
+from assets.github import github_commits_raw 
+from assets.processed import github_commits_parquet 
+from resources.bigquery import BigQueryResource 
+from resources.gcs import GCSResource 
 
 
 def date_range(start: date, end: date) -> list[date]:
