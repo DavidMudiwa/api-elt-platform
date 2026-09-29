@@ -5,6 +5,7 @@ from assets.github import github_commits_raw, github_repositories_raw
 from assets.processed import github_commits_parquet, github_repositories_parquet
 from resources.bigquery import BigQueryResource
 from resources.gcs import GCSResource
+from schedules.commits import commits_daily_schedule
 
 defs = Definitions(
     assets=[
@@ -15,6 +16,7 @@ defs = Definitions(
         github_repositories_bq,
         github_commits_bq,
     ],
+    schedules=[commits_daily_schedule],
     resources={
         "gcs": GCSResource(),
         "bigquery": BigQueryResource(),

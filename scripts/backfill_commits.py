@@ -2,6 +2,13 @@ import os
 import sys
 from datetime import date, timedelta
 from pathlib import Path
+from dagster import InMemoryIOManager, materialize 
+from assets.bigquery import github_commits_bq 
+from assets.github import github_commits_raw 
+from assets.processed import github_commits_parquet 
+from resources.bigquery import BigQueryResource 
+from resources.gcs import GCSResource 
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
@@ -15,14 +22,6 @@ MAX_PARTITIONS = 5
 adc = REPO_ROOT / "secrets" / "adc.json"
 if adc.exists():
     os.environ.setdefault("GOOGLE_APPLICATION_CREDENTIALS", str(adc))
-
-from dagster import InMemoryIOManager, materialize 
-from assets.bigquery import github_commits_bq 
-from assets.github import github_commits_raw 
-from assets.processed import github_commits_parquet 
-from resources.bigquery import BigQueryResource 
-from resources.gcs import GCSResource 
-
 
 def date_range(start: date, end: date) -> list[date]:
     days = []
